@@ -1,6 +1,7 @@
 ﻿using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,45 +10,52 @@ namespace Hans.MongoDB
 {
     public class Repository<T>
     {
-        private MongoClient _mongoClient;
-        private IMongoDatabase _mongoDatabase;
-        private IMongoCollection<T> _collection;
+        private IMongoCollection<T> Collection { get; set; }
 
         public Repository(string collection)
         {
-            _mongoClient = new MongoClient("mongodb://localhost/Personal");
-            _mongoDatabase = _mongoClient.GetDatabase("Northwind");
-            _collection = _mongoDatabase.GetCollection<T>(collection);
+            var connectionstring = string.Empty;
+
+            if (!string.IsNullOrEmpty(ConfigurationManager.AppSettings.Get("MONGOLAB_URI")))
+                connectionstring = ConfigurationManager.AppSettings.Get("MONGOLAB_URI");
+            else
+                connectionstring = ConfigurationManager.ConnectionStrings["MONGOLAB_URI"].ConnectionString;
+            
+            var url = new MongoUrl(connectionstring);
+            var client = new MongoClient(url);
+            var server = client.GetDatabase(url.DatabaseName);
+
+            Collection = server.GetCollection<T>(collection);
         }
 
         public async Task<T> Get(System.Linq.Expressions.Expression<Func<T, bool>> where)
         {
-            return await _collection.Find(where).SingleAsync();
+            return await Collection.Find(where).SingleAsync();
         }
 
         public async Task Save(T instance)
         {
-            await _collection.InsertOneAsync(instance);
+            await Collection.InsertOneAsync(instance);
         }
 
         public async Task Delete(System.Linq.Expressions.Expression<Func<T, bool>> where)
         {
-            await _collection.DeleteOneAsync(where);
+            await Collection.DeleteOneAsync(where);
         }
 
         public async Task Update(System.Linq.Expressions.Expression<Func<T, bool>> where, T instance)
         {
-            await _collection.ReplaceOneAsync(where, instance);
+            await Collection.ReplaceOneAsync(where, instance);
         }
 
         public async Task<IList<T>> FindAll()
         {
-            return await _collection.Find("{}").ToListAsync();
+            return await Collection.Find("{}").ToListAsync();
         }
 
         public async Task<IList<T>> FindAllBy(System.Linq.Expressions.Expression<Func<T, bool>> where)
         {
-            return await _collection.Find(where).ToListAsync();
+            return await Collection.Find(where).ToListAsync();
         }
     }
 }
